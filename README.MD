@@ -50,9 +50,13 @@ python -m src.IpChangeEmailNotifier
 - Python 3.7+
 - [requests](https://pypi.org/project/requests/)
 - [yagmail](https://pypi.org/project/yagmail/)
+- [ipaddress](https://pypi.org/project/ipaddress/)
 
 ---
 
 ## Project Structure
 
-src/ ├── IpChangeEmailNotifier.py ├── InternetChecker.py └── EmailSender.py
+src/ 
+├── IpChangeEmailNotifier.py
+├── InternetChecker.py
+└── EmailSender.py

@@ -12,6 +12,21 @@ from src.InternetChecker import InternetChecker
 class TestInternetChecker(unittest.TestCase):
     """Tests for InternetChecker class"""
 
+    def test_is_valid_ip_returns_true_for_valid_ips(self):
+        self.assertTrue(InternetChecker.is_valid_ip("127.0.0.1"))
+        self.assertTrue(InternetChecker.is_valid_ip("192.168.1.1"))
+        self.assertTrue(InternetChecker.is_valid_ip("8.8.8.8"))
+        self.assertTrue(InternetChecker.is_valid_ip("255.255.255.255"))
+
+    def test_is_valid_ip_returns_false_for_invalid_ips(self):
+        self.assertFalse(InternetChecker.is_valid_ip("256.256.256.256"))
+        self.assertFalse(InternetChecker.is_valid_ip("abc.def.ghi.jkl"))
+        self.assertFalse(InternetChecker.is_valid_ip("123.456.78.90"))
+        self.assertFalse(InternetChecker.is_valid_ip("192.168.1"))
+        self.assertFalse(InternetChecker.is_valid_ip(""))
+        self.assertFalse(InternetChecker.is_valid_ip(None))
+        self.assertFalse(InternetChecker.is_valid_ip("::1")) # This IPV6 not IPV4
+
     def test_has_internet_real(self):
         """Doesn't mock anything and calls the real test_has_internet_real() function."""
         self.assertTrue(InternetChecker.has_internet())
@@ -104,8 +119,7 @@ class TestInternetChecker(unittest.TestCase):
         services = ("dummy_service1.com", "dummy_service2.com", "dummy_service3.com", "dummy_service4.com")
         num_services = len(services)
 
-        side_effects = [requests.RequestException("fail")] * num_services
-        mock_requests_get.side_effect = side_effects
+        mock_requests_get.side_effect = [requests.RequestException("fail")] * num_services
 
         #Act
         result_public_ip = InternetChecker.get_public_ip_address()
@@ -114,6 +128,48 @@ class TestInternetChecker(unittest.TestCase):
         self.assertFalse(result_public_ip)
         self.assertEqual(mock_requests_get.call_count, num_services)
         self.assertEqual(mock_logging_exception.call_count, num_services)
+
+    @mock.patch("requests.get")
+    @mock.patch("logging.error")
+    def test_get_public_ip_address_get_returns_invalid_ip_for_first_service(self, mock_logging_error, mock_requests_get):
+        """When a service returns an invalid IP, it should try to connect to the next service from services list."""
+
+        #Arrange
+        test_invalid_ip = "203.0.113"
+        test_valid_ip = "203.0.113.42"
+
+        #First service will return invali ip address but second service will return a valid one.
+        mock_requests_get.side_effect = [MagicMock(text=test_invalid_ip), MagicMock(text=test_valid_ip)]
+
+        #Act
+        result_public_ip = InternetChecker.get_public_ip_address()
+
+        #Assert
+        self.assertEqual(test_valid_ip, result_public_ip)
+        self.assertEqual(mock_requests_get.call_count, 2)
+        mock_logging_error.assert_called_once()
+        self.assertIn(test_invalid_ip, mock_logging_error.call_args[0][0]) # Verify logging.error is called with invalid ip string.
+
+    @mock.patch("requests.get")
+    @mock.patch("logging.error")
+    def test_get_public_ip_address_get_returns_invalid_ip_for_for_all_services(self, mock_logging_error, mock_requests_get):
+        """When all services returns invalid IP, it should return None."""
+
+        #Arrange
+        test_invalid_ip = "256.13.11.2" # 256 is invalid in IPV4
+        services = ("dummy_service1.com", "dummy_service2.com", "dummy_service3.com", "dummy_service4.com")
+        num_services = len(services)
+
+        #Return invalid ip address from all services.
+        mock_requests_get.side_effect = [MagicMock(text=test_invalid_ip)] * num_services
+
+        #Act
+        result_public_ip = InternetChecker.get_public_ip_address()
+
+        #Assert
+        self.assertFalse(result_public_ip)
+        self.assertEqual(mock_requests_get.call_count, num_services)
+        self.assertEqual(mock_logging_error.call_count, num_services)
 
     @mock.patch("requests.get")
     @mock.patch("logging.exception")

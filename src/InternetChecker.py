@@ -1,5 +1,6 @@
 import requests
 import logging
+import ipaddress
 
 class InternetChecker(object):
 
@@ -13,7 +14,14 @@ class InternetChecker(object):
             return False
 
     @staticmethod
-    def get_public_ip_address(services=(
+    def is_valid_ip(ip):
+        try:
+            return isinstance(ipaddress.ip_address(ip), ipaddress.IPv4Address)
+        except Exception:
+            return False
+
+    @classmethod
+    def get_public_ip_address(cls, services=(
             "https://api.ipify.org",
             "https://ifconfig.me/ip",
             "https://ipecho.net/plain",
@@ -22,8 +30,10 @@ class InternetChecker(object):
         for service in services:
             try:
                 ip = requests.get(service, timeout=5).text.strip()
-                if ip:
+                if cls.is_valid_ip(ip):
                     return ip
+                else:
+                    logging.error(f"Service ({service}) returned an invalid IP: {ip}")
             except requests.RequestException:
                 logging.exception(f"Could not get successful reply to request from {service}!")
                 continue
